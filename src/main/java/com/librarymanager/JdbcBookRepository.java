@@ -1,10 +1,6 @@
-
 package com.librarymanager;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -12,23 +8,27 @@ import java.util.Optional;
 public class JdbcBookRepository implements BookRepository {
 
     @Override
-    public Book save(Book book) throws SQLException {
+    public Book save(Book book) {
 
         if (book.id() == null) {
-            String sql = "INSERT INTO books (title, author, year, available) VALUES (?, ?, ?, ?) RETURNING id";
 
-            try (Connection connection = DatabaseConnection.getConnection();
-                 PreparedStatement statement = connection.prepareStatement(sql)) {
+            String sql = "INSERT INTO books (title, author, year, available) VALUES (?, ?, ?, ?)";
 
-                statement.setString(1, book.title());
-                statement.setString(2, book.author());
-                statement.setInt(3, book.year());
-                statement.setBoolean(4, book.available());
+            try (Connection con = DatabaseConnection.getConnection();
+                 PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    if (resultSet.next()) {
+                ps.setString(1, book.title());
+                ps.setString(2, book.author());
+                ps.setInt(3, book.year());
+                ps.setBoolean(4, book.available());
+
+                ps.executeUpdate();
+
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+
+                    if (rs.next()) {
                         return new Book(
-                                resultSet.getLong("id"),
+                                rs.getLong(1),
                                 book.title(),
                                 book.author(),
                                 book.year(),
@@ -36,82 +36,114 @@ public class JdbcBookRepository implements BookRepository {
                         );
                     }
                 }
+
+                throw new SQLException("Book was not saved.");
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
+
         } else {
+
             String sql = "UPDATE books SET title = ?, author = ?, year = ?, available = ? WHERE id = ?";
 
-            try (Connection connection = DatabaseConnection.getConnection();
-                 PreparedStatement statement = connection.prepareStatement(sql)) {
+            try (Connection con = DatabaseConnection.getConnection();
+                 PreparedStatement ps = con.prepareStatement(sql)) {
 
-                statement.setString(1, book.title());
-                statement.setString(2, book.author());
-                statement.setInt(3, book.year());
-                statement.setBoolean(4, book.available());
-                statement.setLong(5, book.id());
+                ps.setString(1, book.title());
+                ps.setString(2, book.author());
+                ps.setInt(3, book.year());
+                ps.setBoolean(4, book.available());
+                ps.setLong(5, book.id());
 
-                statement.executeUpdate();
+                ps.executeUpdate();
+
                 return book;
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
         }
-
-        return null;
     }
 
     @Override
-    public List<Book> findAll() throws SQLException {
+    public List<Book> findAll() {
+
         List<Book> books = new ArrayList<>();
-        String sql = "SELECT * FROM books";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
+        String sql = "SELECT * FROM books ORDER BY id";
 
-            while (resultSet.next()) {
-                books.add(mapRow(resultSet));
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+
+                Book book = new Book(
+                        rs.getLong("id"),
+                        rs.getString("title"),
+                        rs.getString("author"),
+                        rs.getInt("year"),
+                        rs.getBoolean("available")
+                );
+
+                books.add(book);
             }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return books;
     }
 
     @Override
-    public Optional<Book> findById(Long id) throws SQLException {
+    public Optional<Book> findById(Long id) {
+
         String sql = "SELECT * FROM books WHERE id = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-            statement.setLong(1, id);
+            ps.setLong(1, id);
 
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    return Optional.of(mapRow(resultSet));
+            try (ResultSet rs = ps.executeQuery()) {
+
+                if (rs.next()) {
+
+                    Book book = new Book(
+                            rs.getLong("id"),
+                            rs.getString("title"),
+                            rs.getString("author"),
+                            rs.getInt("year"),
+                            rs.getBoolean("available")
+                    );
+
+                    return Optional.of(book);
                 }
             }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
 
         return Optional.empty();
     }
 
     @Override
-    public void deleteById(Long id) throws SQLException {
+    public void deleteById(Long id) {
+
         String sql = "DELETE FROM books WHERE id = ?";
 
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-            statement.setLong(1, id);
-            statement.executeUpdate();
+            ps.setLong(1, id);
+
+            ps.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-    }
-
-    private Book mapRow(ResultSet resultSet) throws SQLException {
-        return new Book(
-                resultSet.getLong("id"),
-                resultSet.getString("title"),
-                resultSet.getString("author"),
-                resultSet.getInt("year"),
-                resultSet.getBoolean("available")
-        );
     }
 }

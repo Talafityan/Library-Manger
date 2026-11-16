@@ -1,48 +1,64 @@
 package com.librarymanager;
-import java.sql.SQLException;
-import java.util.ArrayList;
 
 public class Main {
-
-    public static ArrayList<Book> getAllBooks() throws SQLException {
-        BookRepository repository = new JdbcBookRepository();
-
-        return new ArrayList<>(repository.findAll());
-    }
 
     public static void main(String[] args) {
 
         BookRepository repository = new JdbcBookRepository();
         BookService service = new BookService(repository);
 
+        System.out.println("All Books:");
+        repository.findAll().forEach(System.out::println);
+
+        System.out.println("\nAdding a new book:");
+
+        Book newBook = new Book(
+                null,
+                "Java Basics",
+                "John Smith",
+                2022,
+                true
+        );
+
+        Book savedBook = repository.save(newBook);
+        System.out.println(savedBook);
+
+        System.out.println("\nGet Book By ID:");
+        System.out.println(service.getById(savedBook.id()));
+
+        System.out.println("\nUpdate Book:");
+
+        Book updatedBook = new Book(
+                savedBook.id(),
+                "Java Basics Updated",
+                "John Smith",
+                2023,
+                true
+        );
+
+        System.out.println(service.update(savedBook.id(), updatedBook));
+
+        System.out.println("\nSearch By Author:");
+
+        service.searchByAuthor("Robert Martin")
+                .forEach(System.out::println);
+
+        System.out.println("\nAvailable Books Sorted By Year:");
+
+        var availableBooks = service.getAvailableSortedByYear();
+        availableBooks.forEach(System.out::println);
+
+        System.out.println("\nCount Books By Author:");
+        System.out.println(service.countBooksByAuthor());
+
+        System.out.println("\nDelete Book:");
+        service.delete(savedBook.id());
+
+        System.out.println("\nTesting Book Not Found:");
+
         try {
-            ArrayList<Book> books = getAllBooks();
-
-            books.forEach(System.out::println);
-
-            Book newBook = new Book(null, "Clean Code", "Robert Martin", 2008, true);
-            Book savedBook = repository.save(newBook);
-            System.out.println(savedBook);
-
-            System.out.println(service.getById(savedBook.id()));
-
-            Book updatedBook = new Book(savedBook.id(), "Java Programming", "Robert Martin", 2020, true);
-            System.out.println(service.update(savedBook.id(), updatedBook));
-
-            service.searchByAuthor("robert martin").forEach(System.out::println);
-
-            service.getAvailableSortedByYear().forEach(System.out::println);
-
-            System.out.println(service.countBooksByAuthor());
-
-            service.delete(savedBook.id());
-
-            service.getById(-1L);
-
+            service.getById(999L);
         } catch (BookNotFoundException e) {
-            System.out.println(e.getMessage());
-
-        } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
     }
