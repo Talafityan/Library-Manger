@@ -56,7 +56,11 @@ public class JdbcBookRepository implements BookRepository {
                 ps.setBoolean(4, book.available());
                 ps.setLong(5, book.id());
 
-                ps.executeUpdate();
+                int rowsAffected = ps.executeUpdate();
+
+                if (rowsAffected == 0) {
+                    throw new SQLException("Book with id " + book.id() + " was not found.");
+                }
 
                 return book;
 
